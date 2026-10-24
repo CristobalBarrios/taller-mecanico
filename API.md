@@ -2,6 +2,8 @@
 
 Base: `http://localhost:8081/api`. Las respuestas son JSON, salvo las operaciones sin contenido. La interfaz usa esta misma API.
 
+Para ejecutar el recorrido completo, abra la [colección Bruno](bruno/README.md): incluye las rutas siguientes, autenticación, CSRF, captura de IDs y comprobaciones de resultados.
+
 ## Autenticación
 
 Se usa una sesión del servidor con cookie `JSESSIONID`, no JWT. Conserve las cookies entre solicitudes.

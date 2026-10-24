@@ -6,7 +6,8 @@ const dinero = v => new Intl.NumberFormat('es-GT', {style:'currency',currency:'G
 const fecha = v => v ? new Date(v).toLocaleString('es-GT') : '—';
 const roles = ['ADMINISTRADOR','RECEPCION','MECANICO','BODEGUERO'];
 const etiqueta = v => ({ADMINISTRADOR:'Administrador',RECEPCION:'Recepción',MECANICO:'Mecánico',BODEGUERO:'Bodeguero',RECIBIDO:'Recibido',DIAGNOSTICADO:'Diagnosticado',EN_REPARACION:'En reparación',TERMINADO:'Terminado',ENTREGADO:'Entregado',PENDIENTE:'Pendiente',DESPACHADO:'Despachado',RECHAZADO:'Rechazado'}[v] || v);
-const estado = v => `<span class="estado ${escapar(v)}">${escapar(etiqueta(v))}</span>`;
+const estado = v => `<span class="badge text-bg-${({RECIBIDO:'secondary',DIAGNOSTICADO:'info',EN_REPARACION:'warning',TERMINADO:'success',ENTREGADO:'primary',PENDIENTE:'warning',DESPACHADO:'success',RECHAZADO:'danger'}[v] || 'secondary')}">${escapar(etiqueta(v))}</span>`;
+const modal = new bootstrap.Modal($('#modal'));
 let usuario, csrf, seccion, configuracion;
 const puede = (...permitidos) => usuario?.rol === 'ADMINISTRADOR' || permitidos.includes(usuario?.rol);
 
@@ -24,6 +25,7 @@ async function api(ruta, metodo='GET', datos) {
   try { cuerpo = texto ? JSON.parse(texto) : null; } catch { cuerpo = null; }
   if (!r.ok) {
     if (r.status===401 && ruta!=='/login') {
+      modal.hide();
       $('#aplicacion').hidden=true; $('#acceso').hidden=false; usuario=null;
     }
     throw new Error(ruta==='/login' && r.status===401 ? 'Usuario o contraseña incorrectos.' : cuerpo?.error && !['Unauthorized','Forbidden'].includes(cuerpo.error) ? cuerpo.error : ({401:'La sesión terminó. Inicia sesión nuevamente.',403:'No tienes permiso para esta operación o la sesión caducó. Recarga la página.',404:'Registro no encontrado.'}[r.status] || 'No se pudo completar la operación.'));
@@ -31,50 +33,51 @@ async function api(ruta, metodo='GET', datos) {
   return cuerpo;
 }
 function aviso(texto, error=false) {
-  const e=$('#mensaje'); e.textContent=texto; e.className=error?'error':''; e.hidden=false;
+  const e=$('#mensaje'); e.textContent=texto; e.className=error?'alert alert-danger':'alert alert-success'; e.hidden=false;
   e.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 function abrir(titulo, html) {
   $('#titulo-modal').textContent=titulo; $('#cuerpo-modal').innerHTML=html;
-  $('#modal').showModal();
+  modal.show();
+  document.querySelector('.modal-backdrop')?.classList.add('d-print-none');
 }
 function campo(nombre,titulo,tipo='text',valor='',extra='') {
-  return `<label>${titulo}<input name="${nombre}" type="${tipo}" value="${escapar(valor)}" ${extra} required></label>`;
+  return `<label class="col-12 col-md-6 form-label">${titulo}<input class="form-control mt-2" name="${nombre}" type="${tipo}" value="${escapar(valor)}" ${extra} required></label>`;
 }
 function opciones(filas, valor, texto) {
   return filas.map(f=>`<option value="${escapar(f[valor])}">${escapar(typeof texto==='function'?texto(f):f[texto])}</option>`).join('');
 }
 function selector(nombre,titulo,items) {
-  return `<label>${titulo}<select name="${nombre}" required><option value="">Selecciona una opción</option>${items}</select></label>`;
+  return `<label class="col-12 col-md-6 form-label">${titulo}<select class="form-select mt-2" name="${nombre}" required><option value="">Selecciona una opción</option>${items}</select></label>`;
 }
 function area(nombre,titulo,max=2000) {
-  return `<label class="ancho">${titulo}<textarea name="${nombre}" maxlength="${max}" required></textarea></label>`;
+  return `<label class="col-12 form-label">${titulo}<textarea class="form-control mt-2" rows="3" name="${nombre}" maxlength="${max}" required></textarea></label>`;
 }
 function formulario(titulo,campos,guardar) {
-  abrir(titulo,`<form id="formulario" class="rejilla">${campos}<p id="error-formulario" class="error ancho" role="alert"></p><div class="acciones ancho"><button type="button" id="cancelar" class="secundario">Cancelar</button><button type="submit" class="principal">Guardar</button></div></form>`);
-  $('#cancelar').onclick=()=>$('#modal').close();
+  abrir(titulo,`<form id="formulario" class="row g-3">${campos}<p id="error-formulario" class="text-danger col-12" role="alert"></p><div class="col-12 d-flex justify-content-end flex-wrap gap-2"><button type="button" id="cancelar" class="btn btn-outline-secondary">Cancelar</button><button type="submit" class="btn btn-warning fw-semibold">Guardar</button></div></form>`);
+  $('#cancelar').onclick=()=>modal.hide();
   $('#formulario').onsubmit=async e=>{
     e.preventDefault(); const boton=e.submitter; boton.disabled=true;
     const datos=Object.fromEntries(new FormData(e.target));
     e.target.querySelectorAll('input[type=number]').forEach(i=>{datos[i.name]=Number(i.value);});
     e.target.querySelectorAll('select[data-numero]').forEach(i=>{datos[i.name]=Number(i.value);});
-    try { await guardar(datos); $('#modal').close(); await cargar(seccion); aviso('Operación guardada correctamente.'); }
+    try { await guardar(datos); modal.hide(); await cargar(seccion); aviso('Operación guardada correctamente.'); }
     catch(err) { $('#error-formulario').textContent=err.message; }
     finally { boton.disabled=false; }
   };
   $('#formulario').querySelectorAll('select').forEach(s=>{if(s.name.endsWith('Id'))s.dataset.numero='true';});
 }
 function tabla(columnas,filas,vacio='No hay registros todavía.') {
-  if (!filas.length) return `<div class="tabla vacio">${vacio}</div>`;
-  return `<div class="tabla"><table><thead><tr>${columnas.map(c=>`<th scope="col">${c[0]}</th>`).join('')}</tr></thead><tbody>${filas.map(f=>`<tr>${columnas.map(c=>`<td>${typeof c[1]==='function'?c[1](f):escapar(f[c[1]])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  if (!filas.length) return `<div class="alert alert-secondary text-center">${vacio}</div>`;
+  return `<div class="table-responsive border rounded bg-body"><table class="table table-striped table-hover align-middle mb-0"><thead class="table-dark"><tr>${columnas.map(c=>`<th scope="col">${c[0]}</th>`).join('')}</tr></thead><tbody>${filas.map(f=>`<tr>${columnas.map(c=>`<td>${typeof c[1]==='function'?c[1](f):escapar(f[c[1]])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
-function boton(accion,id,texto) {return `<button data-accion="${accion}" data-id="${id}">${texto}</button>`;}
-function cabecera(texto,crear) { return `<div class="barra"><p class="muted">${texto}</p>${crear?`<button id="nuevo" class="principal">+ ${crear}</button>`:''}</div>`; }
+function boton(accion,id,texto) {return `<button class="btn btn-outline-dark btn-sm text-nowrap" data-accion="${accion}" data-id="${id}">${texto}</button>`;}
+function cabecera(texto,crear) { return `<div data-barra class="d-flex flex-wrap align-items-center justify-content-between gap-3 my-3"><p class="text-body-secondary">${texto}</p>${crear?`<button id="nuevo" class="btn btn-warning fw-semibold">+ ${crear}</button>`:''}</div>`; }
 function filtro() {
-  const contenedor=$('#contenido .tabla');
+  const contenedor=$('#contenido .table-responsive');
   if (!contenedor?.querySelector('table')) return;
-  const entrada=document.createElement('input'); entrada.type='search'; entrada.placeholder='Buscar en esta lista…'; entrada.setAttribute('aria-label','Buscar en esta lista');
-  $('#contenido .barra')?.prepend(entrada);
+  const entrada=document.createElement('input'); entrada.type='search'; entrada.className='form-control'; entrada.placeholder='Buscar en esta lista…'; entrada.setAttribute('aria-label','Buscar en esta lista');
+  $('#contenido [data-barra]')?.prepend(entrada);
   entrada.oninput=()=>contenedor.querySelectorAll('tbody tr').forEach(f=>{f.hidden=!f.textContent.toLocaleLowerCase().includes(entrada.value.toLocaleLowerCase());});
 }
 async function iniciar() {
@@ -90,15 +93,19 @@ async function iniciar() {
   if(puede('BODEGUERO')) enlaces.push(['solicitudes','Despachos'],['movimientos','Movimientos de bodega']);
   if(puede('RECEPCION')) enlaces.push(['facturas','Facturación']);
   if(puede()) enlaces.push(['usuarios','Usuarios y roles'],['configuracion','Configuración'],['historial','Historial']);
-  $('#navegacion').innerHTML=enlaces.map(([id,texto])=>`<button data-seccion="${id}">${texto}</button>`).join('');
-  $('#navegacion').onclick=e=>{const b=e.target.closest('[data-seccion]');if(b)cargar(b.dataset.seccion);};
+  $('#navegacion').innerHTML=enlaces.map(([id,texto])=>`<button class="btn btn-outline-light text-start border-0 rounded-1" data-seccion="${id}">${texto}</button>`).join('');
+  $('#navegacion').onclick=e=>{const b=e.target.closest('[data-seccion]');if(b){cargar(b.dataset.seccion);bootstrap.Offcanvas.getInstance($('#panel-lateral'))?.hide();}};
   await cargar(enlaces[0][0]);
 }
 async function cargar(nombre) {
   seccion=nombre; $('#mensaje').hidden=true;
-  document.querySelectorAll('[data-seccion]').forEach(b=>b.classList.toggle('activo',b.dataset.seccion===nombre));
+  document.querySelectorAll('[data-seccion]').forEach(b=>{
+    const seleccionado=b.dataset.seccion===nombre;
+    b.className=seleccionado?'btn btn-warning text-start fw-semibold rounded-1':'btn btn-outline-light text-start border-0 rounded-1';
+    if(seleccionado)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');
+  });
   $('#titulo').textContent=$(`[data-seccion="${nombre}"]`)?.textContent || '';
-  $('#contenido').innerHTML='<p class="cargando">Cargando información…</p>';
+  $('#contenido').innerHTML='<p class="text-body-secondary p-4">Cargando información…</p>';
   try {
     await ({ordenes:verOrdenes,clientes:verClientes,vehiculos:verVehiculos,repuestos:verRepuestos,solicitudes:verSolicitudes,movimientos:verMovimientos,facturas:verFacturas,usuarios:verUsuarios,configuracion:verConfiguracion,historial:verHistorial}[nombre])();
     filtro();
@@ -124,7 +131,7 @@ async function verOrdenes() {
   const filas=await api('/ordenes');
   const abiertas=filas.filter(o=>!['TERMINADO','ENTREGADO'].includes(o.estado)).length;
   const listas=filas.filter(o=>o.estado==='TERMINADO').length;
-  $('#contenido').innerHTML=`<div class="resumen"><div class="dato"><span>EN EL TALLER</span><strong>${abiertas}</strong><span>órdenes en proceso</span></div><div class="dato acento"><span>LISTOS PARA ENTREGA</span><strong>${listas}</strong><span>vehículos terminados</span></div><div class="dato"><span>HISTORIAL</span><strong>${filas.length}</strong><span>órdenes registradas</span></div></div>`+cabecera(usuario.rol==='MECANICO'?'Tus vehículos asignados y su progreso.':'Recepción y seguimiento de los vehículos.',puede('RECEPCION')?'Registrar ingreso':null)+tabla([['Orden',o=>`<strong>#${o.id}</strong>`],['Vehículo',o=>`<strong>${escapar(o.placa)}</strong><br><span class="muted">${escapar(o.marca)} ${escapar(o.modelo)}</span>`],['Cliente','cliente'],['Mecánico','mecanico'],['Estado',o=>estado(o.estado)],['Ingreso',o=>fecha(o.ingreso)],['',o=>boton('detalle',o.id,'Abrir orden →')]],filas,'No hay órdenes. Los ingresos de vehículos aparecerán aquí.');
+  $('#contenido').innerHTML=`<div class="row g-3 mb-4"><div class="col-12 col-md-4"><div class="card border-0 border-start border-warning border-5 rounded-0 shadow-sm h-100"><div class="card-body"><h2 class="h6 text-body-secondary text-uppercase">En el taller</h2><strong class="display-6">${abiertas}</strong><p class="text-body-secondary mb-0">Órdenes en proceso</p></div></div></div><div class="col-12 col-md-4"><div class="card border-0 border-start border-success border-5 rounded-0 shadow-sm h-100"><div class="card-body"><h2 class="h6 text-success">Listos para entrega</h2><strong class="display-6">${listas}</strong><p class="text-body-secondary mb-0">Vehículos terminados</p></div></div></div><div class="col-12 col-md-4"><div class="card border-0 border-start border-dark border-5 rounded-0 shadow-sm h-100"><div class="card-body"><h2 class="h6">Historial</h2><strong class="display-6">${filas.length}</strong><p class="text-body-secondary mb-0">Órdenes registradas</p></div></div></div></div>`+cabecera(usuario.rol==='MECANICO'?'Tus vehículos asignados y su progreso.':'Recepción y seguimiento de los vehículos.',puede('RECEPCION')?'Registrar ingreso':null)+tabla([['Orden',o=>`<strong>#${o.id}</strong>`],['Vehículo',o=>`<strong>${escapar(o.placa)}</strong><br><span class="text-body-secondary">${escapar(o.marca)} ${escapar(o.modelo)}</span>`],['Cliente','cliente'],['Mecánico','mecanico'],['Estado',o=>estado(o.estado)],['Ingreso',o=>fecha(o.ingreso)],['',o=>boton('detalle',o.id,'Abrir orden →')]],filas,'No hay órdenes. Los ingresos de vehículos aparecerán aquí.');
   if($('#nuevo'))$('#nuevo').onclick=async()=>{
     try {
       const [vehiculos,mecanicos]=await Promise.all([api('/vehiculos'),api('/mecanicos')]);
@@ -146,12 +153,12 @@ async function verDetalle(id) {
   }
   if(puede('RECEPCION') && editable)acciones+=boton('asignar',id,'Reasignar mecánico');
   if(puede('RECEPCION') && o.estado==='TERMINADO')acciones+=o.facturas.length?boton('entregar',id,'Registrar salida'):boton('facturar',id,'Emitir factura');
-  abrir('Orden #'+id,`<div class="barra">${estado(o.estado)}<span class="muted">Ingreso: ${fecha(o.ingreso)}</span></div><p class="texto">${escapar(o.motivo)}</p>${o.salida?`<p class="muted">Salida: ${fecha(o.salida)}</p>`:''}<div class="acciones" style="flex-wrap:wrap">${acciones}</div><hr class="separador"><h3>Diagnósticos y reparaciones</h3>${o.diagnosticos.length?o.diagnosticos.map(d=>`<div class="tarjeta"><p class="muted">${escapar(d.mecanico)} · ${fecha(d.fecha)}</p><strong>Fallas detectadas</strong><p class="texto">${escapar(d.descripcion)}</p><strong>Reparación requerida</strong><p class="texto">${escapar(d.reparacion)}</p></div>`).join(''):'<p class="muted">El mecánico aún no registra un diagnóstico.</p>'}<h3>Repuestos solicitados</h3>${tabla([['Repuesto','repuesto'],['Cantidad','cantidad'],['Estado',s=>estado(s.estado)],['Precio unitario',s=>s.precio_unitario==null?'—':dinero(s.precio_unitario)]],o.solicitudes,'Sin solicitudes de repuestos.')}<p class="muted" style="margin-top:20px">Mano de obra: ${dinero(o.mano_obra)}</p>${o.facturas.map(f=>`<p>Factura #${f.id} · Total: <strong>${dinero(f.total)}</strong></p>`).join('')}`);
+  abrir('Orden #'+id,`<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 my-3">${estado(o.estado)}<span class="text-body-secondary">Ingreso: ${fecha(o.ingreso)}</span></div><p class="text-break">${escapar(o.motivo)}</p>${o.salida?`<p class="text-body-secondary">Salida: ${fecha(o.salida)}</p>`:''}<div class="d-flex flex-wrap justify-content-end gap-2 d-print-none">${acciones}</div><hr class="my-4"><h3>Diagnósticos y reparaciones</h3>${o.diagnosticos.length?o.diagnosticos.map(d=>`<div class="card card-body my-3"><p class="text-body-secondary">${escapar(d.mecanico)} · ${fecha(d.fecha)}</p><strong>Fallas detectadas</strong><p class="text-break">${escapar(d.descripcion)}</p><strong>Reparación requerida</strong><p class="text-break">${escapar(d.reparacion)}</p></div>`).join(''):'<p class="text-body-secondary">El mecánico aún no registra un diagnóstico.</p>'}<h3>Repuestos solicitados</h3>${tabla([['Repuesto','repuesto'],['Cantidad','cantidad'],['Estado',s=>estado(s.estado)],['Precio unitario',s=>s.precio_unitario==null?'—':dinero(s.precio_unitario)]],o.solicitudes,'Sin solicitudes de repuestos.')}<p class="text-body-secondary mt-3">Mano de obra: ${dinero(o.mano_obra)}</p>${o.facturas.map(f=>`<p>Factura #${f.id} · Total: <strong>${dinero(f.total)}</strong></p>`).join('')}`);
   $('#cuerpo-modal').dataset.orden=JSON.stringify(o);
 }
 async function verRepuestos() {
   const filas=await api('/repuestos');
-  $('#contenido').innerHTML=cabecera('Existencias actuales. El stock se descuenta al despachar.',puede('BODEGUERO')?'Registrar repuesto':null)+tabla([['Código','codigo'],['Repuesto','nombre'],['Precio',r=>dinero(r.precio)],['Existencia',r=>`<strong>${r.stock}</strong>${r.stock<=r.minimo?' <span class="estado PENDIENTE">Stock bajo</span>':''}`],['Mínimo','minimo'],['',r=>puede('BODEGUERO')?boton('entrada',r.id,'Registrar entrada'):'Consulta en tiempo real']],filas);
+  $('#contenido').innerHTML=cabecera('Existencias actuales. El stock se descuenta al despachar.',puede('BODEGUERO')?'Registrar repuesto':null)+tabla([['Código','codigo'],['Repuesto','nombre'],['Precio',r=>dinero(r.precio)],['Existencia',r=>`<strong>${r.stock}</strong>${r.stock<=r.minimo?' <span class="badge text-bg-warning">Stock bajo</span>':''}`],['Mínimo','minimo'],['',r=>puede('BODEGUERO')?boton('entrada',r.id,'Registrar entrada'):'Consulta en tiempo real']],filas);
   if($('#nuevo'))$('#nuevo').onclick=()=>formulario('Registrar repuesto',campo('codigo','Código','text','','maxlength="40"')+campo('nombre','Nombre','text','','maxlength="100"')+campo('precio','Precio unitario (Q)','number','0','min="0" max="99999999.99" step="0.01"')+campo('stock','Existencia inicial','number','0','min="0" max="2147483647"')+campo('minimo','Existencia mínima','number','2','min="0" max="2147483647"'),d=>api('/repuestos','POST',d));
 }
 async function verSolicitudes() {
@@ -168,12 +175,12 @@ async function verFacturas() {
 }
 async function verUsuarios() {
   const filas=await api('/usuarios');
-  $('#contenido').innerHTML=cabecera('Asigna un rol para definir los permisos de cada usuario.','Crear usuario')+tabla([['Nombre','nombre'],['Usuario','usuario'],['Rol',u=>escapar(etiqueta(u.rol))],['',u=>u.id===usuario.id?'<span class="muted">Tu usuario</span>':boton('rol',u.id,'Cambiar rol')]],filas)+`<div class="tarjeta"><h3>Permisos por rol</h3><p class="muted">Administrador: acceso global y configuración.<br>Recepción: clientes, vehículos, ingresos, facturas y entregas.<br>Mecánico: diagnósticos, repuestos y estados de sus órdenes asignadas.<br>Bodeguero: inventario, entradas y despacho de solicitudes.</p></div>`;
+  $('#contenido').innerHTML=cabecera('Asigna un rol para definir los permisos de cada usuario.','Crear usuario')+tabla([['Nombre','nombre'],['Usuario','usuario'],['Rol',u=>escapar(etiqueta(u.rol))],['',u=>u.id===usuario.id?'<span class="text-body-secondary">Tu usuario</span>':boton('rol',u.id,'Cambiar rol')]],filas)+`<div class="card card-body my-3"><h3>Permisos por rol</h3><p class="text-body-secondary">Administrador: acceso global y configuración.<br>Recepción: clientes, vehículos, ingresos, facturas y entregas.<br>Mecánico: diagnósticos, repuestos y estados de sus órdenes asignadas.<br>Bodeguero: inventario, entradas y despacho de solicitudes.</p></div>`;
   $('#nuevo').onclick=()=>formulario('Crear usuario',campo('nombre','Nombre completo','text','','maxlength="100"')+campo('usuario','Usuario','text','','pattern="[a-zA-Z0-9._-]{3,60}" title="De 3 a 60 letras, números, punto, guion o guion bajo" autocomplete="off"')+campo('clave','Contraseña','password','','minlength="8" maxlength="72" autocomplete="new-password"')+selector('rol','Rol',roles.map(r=>`<option value="${r}">${etiqueta(r)}</option>`).join('')),d=>api('/usuarios','POST',d));
 }
 async function verConfiguracion() {
   const c=await api('/configuracion');
-  $('#contenido').innerHTML=`<div class="tarjeta"><h3>Datos del taller</h3><p class="muted">Se muestran en la aplicación y al imprimir comprobantes.</p><form id="configuracion" class="rejilla">${campo('nombre','Nombre del taller','text',c.nombre,'maxlength="100"')}<label>Teléfono<input name="telefono" value="${escapar(c.telefono)}" maxlength="30"></label><label class="ancho">Dirección<input name="direccion" value="${escapar(c.direccion)}" maxlength="200"></label><div class="acciones ancho"><button class="principal">Guardar cambios</button></div></form></div>`;
+  $('#contenido').innerHTML=`<div class="card card-body my-3"><h3>Datos del taller</h3><p class="text-body-secondary">Se muestran en la aplicación y al imprimir comprobantes.</p><form id="configuracion" class="row g-3">${campo('nombre','Nombre del taller','text',c.nombre,'maxlength="100"')}<label class="col-12 col-md-6 form-label">Teléfono<input class="form-control mt-2" name="telefono" value="${escapar(c.telefono)}" maxlength="30"></label><label class="col-12 form-label">Dirección<input class="form-control mt-2" name="direccion" value="${escapar(c.direccion)}" maxlength="200"></label><div class="col-12 d-flex justify-content-end flex-wrap gap-2"><button class="btn btn-warning fw-semibold">Guardar cambios</button></div></form></div>`;
   $('#configuracion').onsubmit=async e=>{
     e.preventDefault();e.submitter.disabled=true;
     try{const d=Object.fromEntries(new FormData(e.target));await api('/configuracion','PUT',d);configuracion=d;$('#marca-taller').textContent=d.nombre;aviso('Datos del taller actualizados.');}catch(err){aviso(err.message,true);}finally{e.submitter.disabled=false;}
@@ -188,12 +195,12 @@ async function accion(nombre,id) {
   if(nombre==='estado') {
     const o=JSON.parse($('#cuerpo-modal').dataset.orden);
     const siguiente=o.estado==='DIAGNOSTICADO'?'EN_REPARACION':'TERMINADO';
-    return formulario(etiqueta(siguiente)+' · #'+id,`<p class="nota ancho">${siguiente==='TERMINADO'?'Confirma que el trabajo está completo y registra el importe final de mano de obra. No puede haber solicitudes pendientes.':'La orden pasará a reparación.'}</p>`+campo('manoObra','Mano de obra (Q)','number',o.mano_obra,'min="0" max="99999999.99" step="0.01"'),d=>api(`/ordenes/${id}/estado`,'PUT',{...d,estado:siguiente}));
+    return formulario(etiqueta(siguiente)+' · #'+id,`<p class="alert alert-info col-12">${siguiente==='TERMINADO'?'Confirma que el trabajo está completo y registra el importe final de mano de obra. No puede haber solicitudes pendientes.':'La orden pasará a reparación.'}</p>`+campo('manoObra','Mano de obra (Q)','number',o.mano_obra,'min="0" max="99999999.99" step="0.01"'),d=>api(`/ordenes/${id}/estado`,'PUT',{...d,estado:siguiente}));
   }
   if(nombre==='solicitar') {
     const repuestos=await api('/repuestos');
     if(!repuestos.length)throw new Error('Bodega debe registrar repuestos antes de solicitarlos.');
-    formulario('Solicitar repuesto · #'+id,selector('repuestoId','Repuesto',opciones(repuestos,'id',r=>`${r.codigo} · ${r.nombre} (${r.stock} disponibles)`))+campo('cantidad','Cantidad','number',1,'min="1" max="2147483647"')+'<div class="ancho"><button id="consultar" type="button">Consultar existencia</button><p id="resultado-stock" class="muted" aria-live="polite"></p></div>',async d=>{
+    formulario('Solicitar repuesto · #'+id,selector('repuestoId','Repuesto',opciones(repuestos,'id',r=>`${r.codigo} · ${r.nombre} (${r.stock} disponibles)`))+campo('cantidad','Cantidad','number',1,'min="1" max="2147483647"')+'<div class="col-12"><button id="consultar" type="button" class="btn btn-outline-dark mb-2">Consultar existencia</button><p id="resultado-stock" class="text-body-secondary" aria-live="polite"></p></div>',async d=>{
       const consulta=await api(`/repuestos/${d.repuestoId}/existencia?cantidad=${d.cantidad}`);
       if(!consulta.disponible)throw new Error('No hay existencias suficientes para esta cantidad.');
       await api(`/ordenes/${id}/solicitudes`,'POST',d);
@@ -208,13 +215,19 @@ async function accion(nombre,id) {
     return formulario('Reasignar mecánico · #'+id,selector('mecanicoId','Nuevo responsable',opciones(mecanicos,'id','nombre')),d=>api(`/ordenes/${id}/mecanico`,'PUT',d));
   }
   if(nombre==='entrada')return formulario('Entrada de inventario',campo('cantidad','Cantidad recibida','number',1,'min="1" max="2147483647"')+campo('motivo','Motivo / referencia','text','','maxlength="300"'),d=>api(`/repuestos/${id}/entradas`,'POST',d));
-  if(nombre==='despachar')return formulario('Resolver solicitud #'+id,'<p class="nota ancho">El despacho comprueba las existencias actuales y descuenta la cantidad solicitada. El rechazo no modifica el inventario.</p>'+selector('estado','Acción','<option value="DESPACHADO">Despachar repuestos</option><option value="RECHAZADO">Rechazar solicitud</option>'),d=>api('/solicitudes/'+id,'PUT',d));
+  if(nombre==='despachar')return formulario('Resolver solicitud #'+id,'<p class="alert alert-info col-12">El despacho comprueba las existencias actuales y descuenta la cantidad solicitada. El rechazo no modifica el inventario.</p>'+selector('estado','Acción','<option value="DESPACHADO">Despachar repuestos</option><option value="RECHAZADO">Rechazar solicitud</option>'),d=>api('/solicitudes/'+id,'PUT',d));
   if(nombre==='rol')return formulario('Asignar rol',selector('rol','Rol',roles.map(r=>`<option value="${r}">${etiqueta(r)}</option>`).join('')),d=>api(`/usuarios/${id}/rol`,'PUT',d));
-  if(nombre==='facturar' || nombre==='entregar')return formulario(nombre==='facturar'?'Emitir factura · #'+id:'Registrar salida · #'+id,`<p class="nota ancho">${nombre==='facturar'?'Se emitirá un comprobante interno con la mano de obra y los repuestos despachados. El importe queda guardado y no se puede editar.':'Confirma la entrega del vehículo al cliente. Se registrará la fecha de salida.'}</p>`,()=>api(`/ordenes/${id}/${nombre==='facturar'?'factura':'entrega'}`,'POST'));
+  if(nombre==='facturar' || nombre==='entregar')return formulario(nombre==='facturar'?'Emitir factura · #'+id:'Registrar salida · #'+id,`<p class="alert alert-info col-12">${nombre==='facturar'?'Se emitirá un comprobante interno con la mano de obra y los repuestos despachados. El importe queda guardado y no se puede editar.':'Confirma la entrega del vehículo al cliente. Se registrará la fecha de salida.'}</p>`,()=>api(`/ordenes/${id}/${nombre==='facturar'?'factura':'entrega'}`,'POST'));
   if(nombre==='ver-factura') {
     const f=JSON.parse($('#contenido').dataset.facturas).find(f=>f.id===id);
-    abrir('Comprobante interno #'+id,`<h3>${escapar(configuracion.nombre)}</h3><p class="muted">${escapar(configuracion.direccion)}<br>${escapar(configuracion.telefono)}</p><p class="muted">${fecha(f.fecha)} · Orden #${f.orden_id} · ${escapar(f.placa)}</p><div class="tarjeta"><strong>${escapar(f.cliente_nombre)}</strong><p>NIT: ${escapar(f.cliente_nit)}</p></div>${tabla([['Concepto','concepto'],['Importe',r=>dinero(r.importe)]],[{concepto:'Mano de obra',importe:f.mano_obra},{concepto:'Repuestos despachados',importe:f.repuestos}])}<p class="factura-total">Total ${dinero(f.total)}</p><p class="muted">Comprobante interno del taller. No es un documento tributario FEL.</p><div class="acciones"><button id="imprimir" class="principal">Imprimir</button></div>`);
-    $('#imprimir').onclick=()=>window.print();
+    abrir('Comprobante interno #'+id,`<h3>${escapar(configuracion.nombre)}</h3><p class="text-body-secondary">${escapar(configuracion.direccion)}<br>${escapar(configuracion.telefono)}</p><p class="text-body-secondary">${fecha(f.fecha)} · Orden #${f.orden_id} · ${escapar(f.placa)}</p><div class="card card-body my-3"><strong>${escapar(f.cliente_nombre)}</strong><p>NIT: ${escapar(f.cliente_nit)}</p></div>${tabla([['Concepto','concepto'],['Importe',r=>dinero(r.importe)]],[{concepto:'Mano de obra',importe:f.mano_obra},{concepto:'Repuestos despachados',importe:f.repuestos}])}<p class="fs-4 fw-bold text-end">Total ${dinero(f.total)}</p><p class="text-body-secondary">Comprobante interno del taller. No es un documento tributario FEL.</p><div class="d-flex flex-wrap justify-content-end gap-2 d-print-none"><button id="imprimir" class="btn btn-warning fw-semibold">Imprimir</button></div>`);
+    $('#imprimir').onclick=()=>{
+      const impresion=$('#comprobante-impresion');
+      impresion.replaceChildren($('#titulo-modal').cloneNode(true), $('#cuerpo-modal').cloneNode(true));
+      impresion.querySelectorAll('[id]').forEach(e=>e.removeAttribute('id'));
+      window.print();
+      impresion.replaceChildren();
+    };
   }
 }
 document.addEventListener('click',async e=>{
@@ -222,11 +235,11 @@ document.addEventListener('click',async e=>{
   b.disabled=true;
   try{
     // Se reutiliza una sola ventana para los formularios y el detalle.
-    if(b.closest('dialog') && b.dataset.accion!=='detalle')$('#modal').close();
+    if(b.closest('#modal') && b.dataset.accion!=='detalle')modal.hide();
     await accion(b.dataset.accion,Number(b.dataset.id));
   }catch(err){aviso(err.message,true);}finally{b.disabled=false;}
 });
-$('#cerrar-modal').onclick=()=>$('#modal').close();
+$('#cerrar-modal').onclick=()=>modal.hide();
 $('#login').onsubmit=async e=>{
   e.preventDefault();const b=e.submitter;b.disabled=true;$('#error-login').textContent='';
   try{await token();await api('/login','POST',new URLSearchParams(new FormData(e.target)));e.target.reset();await token();await iniciar();}

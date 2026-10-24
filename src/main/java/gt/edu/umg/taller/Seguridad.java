@@ -31,7 +31,7 @@ public class Seguridad {
 
     @Bean SecurityFilterChain filtros(HttpSecurity http) throws Exception {
         http.authorizeHttpRequests(a -> a
-            .requestMatchers("/", "/index.html", "/estilos.css", "/app.js", "/api/csrf").permitAll()
+            .requestMatchers("/", "/index.html", "/app.js", "/api/csrf").permitAll()
             .anyRequest().authenticated())
             .formLogin(f -> f.loginProcessingUrl("/api/login")
                 .successHandler((req, res, auth) -> { res.setContentType("application/json"); res.getWriter().write("{\"ok\":true}"); })

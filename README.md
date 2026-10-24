@@ -1,9 +1,11 @@
 # Taller mecánico
 
-Proyecto II de Desarrollo Web. Aplicación Java con Spring Boot, MySQL y una interfaz HTML/CSS/JavaScript sin frameworks adicionales.
+Proyecto II de Desarrollo Web. Aplicación Java con Spring Boot, MySQL y una interfaz HTML/JavaScript con Bootstrap 5.3.8, sin CSS personalizado. Bootstrap se carga desde CDN y requiere conexión a Internet en el navegador.
 
 ## Documentación
 
+- [Manual de usuario en Word](documentacion/Manual_de_usuario_Taller_mecanico.docx): instalación, ejecución en IntelliJ y operación por roles.
+- [Colección Bruno](bruno/README.md): 39 solicitudes para ejecutar toda la API con sesión, CSRF e IDs automáticos.
 - [Guía para explicar el código](GUIA_EXPLICACION_CODIGO.md): directorios, archivos, métodos de ejemplo y recorrido sugerido para la exposición.
 - [Requerimientos](REQUERIMIENTOS.md): alcance acordado y condición de no sobreingeniería.
 - [Manual de instalación y usuario](MANUAL_USUARIO.md): requisitos, configuración y uso de los cuatro roles.
@@ -65,7 +67,7 @@ src/main/resources/
   application.properties  Configuración mediante variables de entorno
   schema.sql              Tablas y relaciones
   datos-demo.sql          Registros opcionales para presentación
-  static/                 Interfaz HTML, CSS y JavaScript
+  static/                 Interfaz HTML y JavaScript con Bootstrap
 src/test/java/gt/edu/umg/taller/
   FlujoTallerTest.java     Pruebas de integración con MySQL real
 ```
