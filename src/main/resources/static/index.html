@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#163b36">
+  <title>Taller | Gestión de operaciones</title>
+  <link rel="stylesheet" href="/estilos.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <section id="acceso" class="acceso">
+    <div class="presentacion">
+      <span class="marca">TM <span>TALLER MECÁNICO</span></span>
+      <div><p class="etiqueta">CONTROL EN CADA ETAPA</p><h1>Tu taller,<br>en orden.</h1><p>Del ingreso del vehículo a la entrega.<br>Todo el trabajo, en un solo lugar.</p></div>
+      <p class="pie-presentacion">Recepción · Mecánica · Bodega · Administración</p>
+    </div>
+    <div class="panel-acceso">
+      <form id="login" class="login">
+        <p class="etiqueta">GESTIÓN DEL TALLER</p><h2>Iniciar sesión</h2>
+        <p class="muted">Ingresa con el usuario asignado por el administrador.</p>
+        <label>Usuario<input name="username" autocomplete="username" required maxlength="60" autofocus></label>
+        <label>Contraseña<input name="password" type="password" autocomplete="current-password" required></label>
+        <p id="error-login" role="alert" class="error"></p>
+        <button class="principal" type="submit">Ingresar <span aria-hidden="true">→</span></button>
+      </form>
+    </div>
+  </section>
+  <div id="aplicacion" class="aplicacion" hidden>
+    <aside>
+      <a class="marca" href="/">TM <span id="marca-taller">TALLER MECÁNICO</span></a>
+      <p class="etiqueta">ESPACIO DE TRABAJO</p>
+      <nav id="navegacion" aria-label="Secciones"></nav>
+      <div class="perfil"><strong id="nombre-usuario"></strong><span id="rol-usuario"></span><button id="salir" class="secundario">Cerrar sesión</button></div>
+    </aside>
+    <main>
+      <header><div><p class="etiqueta">OPERACIONES DEL TALLER</p><h1 id="titulo">Órdenes de trabajo</h1></div><span id="fecha-hoy" class="muted"></span></header>
+      <div id="mensaje" role="status" aria-live="polite" hidden></div>
+      <section id="contenido" aria-label="Contenido de la sección"></section>
+    </main>
+  </div>
+  <dialog id="modal" aria-labelledby="titulo-modal"><div class="cabecera-modal"><h2 id="titulo-modal"></h2><button id="cerrar-modal" aria-label="Cerrar ventana" class="icono">×</button></div><div id="cuerpo-modal"></div></dialog>
+</body>
+</html>
